@@ -20,7 +20,7 @@ enum Outcome {
     FAILED,
 }
 
-/// Checks the invalidity of guessed word
+/// Checks the validity of guessed word
 fn is_valid(word: &str) -> bool {
     ACCEPTABLE.contains(&word)
 }
@@ -119,63 +119,79 @@ fn print_state_tty(guess: &str, word_state: &[Status; WORD_LENGTH], &alphabet_st
 
 /// The main function for the Wordle game, implement your own logic here
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // let is_tty = atty::is(atty::Stream::Stdout);
-    let is_tty = false;
-    let config = Cli::parse().get();
+    let is_tty = atty::is(atty::Stream::Stdout);
+    // let is_tty = false;
+    let config = Cli::parse();
 
     let mut answer = String::new();
+    let mut bias = 0;
 
-    if config.random {
-        let mut rng = StdRng::seed_from_u64(config.seed);
-        let mut final_set_vec = FINAL.to_vec();
-        final_set_vec.shuffle(&mut rng);
-        // Get a random string as the final answer
-        answer = final_set_vec[(config.day - 1) as usize].to_string();
-    } else {
-        if config.word != "" {
-            // Get the string in config as the final answer
-            answer = config.word.to_string();
+    loop {
+        if config.random {
+            let mut rng = StdRng::seed_from_u64(config.seed);
+            let mut final_set_vec = FINAL.to_vec();
+            final_set_vec.shuffle(&mut rng);
+            // Get a random string as the final answer
+            answer = final_set_vec[(config.day + bias - 1) as usize].to_string();
         } else {
-            // Get user's input string as the final answer
-            io::stdin().read_line(&mut answer)?;
-        }
-    }
-
-    let answer = answer.trim();
-    let mut chances_left = TOTAL_CHANCES;
-    let mut alphabet_state = [Status::UNKNOWN; ALPHABET_SIZE];
-
-    let status = loop {
-        chances_left -= 1;
-
-        if chances_left < 0 {
-            break Outcome::FAILED;
-        }
-
-        let mut guess = String::new();
-        io::stdin().read_line(&mut guess)?;
-        let guess = guess.trim();
-
-        if is_valid(guess) {
-            let mut word_state = [Status::UNKNOWN; WORD_LENGTH];
-            update_state(guess, &mut word_state, &mut alphabet_state, answer);
-            match is_tty {
-                true => print_state_tty(guess, &word_state, &alphabet_state),
-                false => print_state_not_tty(&word_state, &alphabet_state),
+            if config.word != "" {
+                // Get the string in config as the final answer
+                answer = config.word.to_string();
+            } else {
+                // Get user's input string as the final answer
+                io::stdin().read_line(&mut answer)?;
             }
-            if guess == answer {
-                break Outcome::SUCCESS;
-            }
-        } else {
-            chances_left += 1;
-            println!("INVALID");
-            continue;
         }
-    };
 
-    match status {
-        Outcome::SUCCESS => println!("CORRECT {}", TOTAL_CHANCES - chances_left),
-        Outcome::FAILED => println!("FAILED {}", answer.to_ascii_uppercase()),
+        let answer = answer.trim();
+        let mut chances_left = TOTAL_CHANCES;
+        let mut alphabet_state = [Status::UNKNOWN; ALPHABET_SIZE];
+
+        let status = loop {
+            chances_left -= 1;
+
+            if chances_left < 0 {
+                break Outcome::FAILED;
+            }
+
+            let mut guess = String::new();
+            io::stdin().read_line(&mut guess)?;
+            let guess = guess.trim();
+
+            if is_valid(guess) {
+                let mut word_state = [Status::UNKNOWN; WORD_LENGTH];
+                update_state(guess, &mut word_state, &mut alphabet_state, answer);
+                match is_tty {
+                    true => print_state_tty(guess, &word_state, &alphabet_state),
+                    false => print_state_not_tty(&word_state, &alphabet_state),
+                }
+                if guess == answer {
+                    break Outcome::SUCCESS;
+                }
+            } else {
+                chances_left += 1;
+                println!("INVALID");
+                continue;
+            }
+        };
+
+        match status {
+            Outcome::SUCCESS => println!("CORRECT {}", TOTAL_CHANCES - chances_left),
+            Outcome::FAILED => println!("FAILED {}", answer.to_ascii_uppercase()),
+        }
+
+        if config.word != "" || config.random {
+            break;
+        }
+        let mut option = String::new();
+        io::stdin().read_line(&mut option)?;
+        let option = option.trim();
+
+        match option {
+            "Y" => bias += 1,
+            "N" => break,
+            _ => panic!("Invalid input!")
+        }
     }
 
     Ok(())
