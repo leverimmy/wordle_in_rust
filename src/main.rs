@@ -1,48 +1,23 @@
+use clap::Parser;
 use colored::Colorize;
 use std::io::{self, Write};
+use rand::seq::SliceRandom;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
+
+mod cli;
+use cli::Cli;
+mod status;
+use status::Status;
 include!("builtin_words.rs");
 
 const TOTAL_CHANCES: i32 = 6;
 const WORD_LENGTH: usize = 5;
 const ALPHABET_SIZE: usize = 26;
 
-enum RESULT {
+enum Outcome {
     SUCCESS,
     FAILED,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Status {
-    UNKNOWN,
-    RED,
-    YELLOW,
-    GREEN,
-}
-
-impl PartialOrd for Status {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        use std::cmp::Ordering;
-
-        match (self, other) {
-            (Status::GREEN, Status::GREEN)
-            | (Status::YELLOW, Status::YELLOW)
-            | (Status::RED, Status::RED)
-            | (Status::UNKNOWN, Status::UNKNOWN) => Some(Ordering::Equal),
-
-            (Status::GREEN, _)
-            | (Status::YELLOW, Status::RED)
-            | (Status::YELLOW, Status::UNKNOWN)
-            | (Status::RED, Status::UNKNOWN) => Some(Ordering::Greater),
-
-            _ => Some(Ordering::Less),
-        }
-    }
-}
-
-impl Ord for Status {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
-    }
 }
 
 /// Checks the invalidity of guessed word
@@ -146,12 +121,27 @@ fn print_state_tty(guess: &str, word_state: &[Status; WORD_LENGTH], &alphabet_st
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let is_tty = atty::is(atty::Stream::Stdout);
     let is_tty = false;
+    let config = Cli::parse().get();
 
-    // Get user's input string as the final answer
     let mut answer = String::new();
-    io::stdin().read_line(&mut answer)?;
-    let answer = answer.trim();
 
+    if config.random {
+        let mut rng = StdRng::seed_from_u64(config.seed);
+        let mut final_set_vec = FINAL.to_vec();
+        final_set_vec.shuffle(&mut rng);
+        // Get a random string as the final answer
+        answer = final_set_vec[(config.day - 1) as usize].to_string();
+    } else {
+        if config.word != "" {
+            // Get the string in config as the final answer
+            answer = config.word.to_string();
+        } else {
+            // Get user's input string as the final answer
+            io::stdin().read_line(&mut answer)?;
+        }
+    }
+
+    let answer = answer.trim();
     let mut chances_left = TOTAL_CHANCES;
     let mut alphabet_state = [Status::UNKNOWN; ALPHABET_SIZE];
 
@@ -159,7 +149,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         chances_left -= 1;
 
         if chances_left < 0 {
-            break RESULT::FAILED;
+            break Outcome::FAILED;
         }
 
         let mut guess = String::new();
@@ -174,7 +164,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 false => print_state_not_tty(&word_state, &alphabet_state),
             }
             if guess == answer {
-                break RESULT::SUCCESS;
+                break Outcome::SUCCESS;
             }
         } else {
             chances_left += 1;
@@ -184,17 +174,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     match status {
-        RESULT::SUCCESS => println!("CORRECT {}", TOTAL_CHANCES - chances_left),
-        RESULT::FAILED => println!("FAILED {}", answer.to_ascii_uppercase()),
+        Outcome::SUCCESS => println!("CORRECT {}", TOTAL_CHANCES - chances_left),
+        Outcome::FAILED => println!("FAILED {}", answer.to_ascii_uppercase()),
     }
-
-    /*// example: print arguments
-    print!("Command line arguments: ");
-    for arg in std::env::args() {
-        print!("{} ", arg);
-    }
-    println!("");
-    // TODO: parse the arguments in `args`*/
 
     Ok(())
 }
