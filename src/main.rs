@@ -5,6 +5,8 @@ use std::io::{self, Write};
 use rand::seq::SliceRandom;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
+use std::collections::HashSet;
+use std::fs::read_to_string;
 
 mod cli;
 use cli::Cli;
@@ -23,7 +25,7 @@ enum Outcome {
 }
 
 /// Checks the validity of guessed word
-fn is_valid(round: i32, word: &str, difficult: bool, last_guessed_strings: &Option<&String>, last_word_state: &Option<&[Status; WORD_LENGTH]>) -> bool {
+fn is_valid(round: i32, word: &str, difficult: bool, last_guessed_strings: &Option<&String>, last_word_state: &Option<&[Status; WORD_LENGTH]>, acceptable_set: &Vec<String>) -> bool {
     if !difficult || round == 1 {
         ACCEPTABLE.contains(&(word.to_lowercase().as_str()))
     } else {
@@ -185,6 +187,29 @@ fn find_most_frequent_strings(strings: &Vec::<String>, n: usize) -> Vec<(String,
     }
 }
 
+/// Load word lists from files
+fn load_word_list(file_path: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let content = read_to_string(file_path)?;
+    let word_list: Vec<String> = content
+        .lines()
+        .map(|line| line.trim().to_uppercase())
+        .collect();
+    let unique_words: HashSet<String> = word_list.iter().cloned().collect();
+
+    if unique_words.len() != word_list.len() {
+        return Err("Duplicate words found in the word list".into());
+    }
+
+    Ok(word_list)
+}
+
+/// Check subset
+fn check_subset(subset: &[String], superset: &[String]) -> bool {
+    let subset_set: HashSet<&String> = subset.iter().collect();
+    let superset_set: HashSet<&String> = superset.iter().collect();
+    subset_set.is_subset(&superset_set)
+}
+
 /// The main function for the Wordle game, implement your own logic here
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_tty = atty::is(atty::Stream::Stdout);
@@ -197,6 +222,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut win_guesses = 0;
     let mut all_guesses_strings: Vec<String> = Vec::new();
 
+    let final_word_list = load_word_list(&config.final_set)?;
+    let acceptable_word_list = load_word_list(&config.acceptable_set)?;
+    if !check_subset(&final_word_list, &acceptable_word_list) {
+        return Err("The final word list is not a strict subset of the acceptable word list".into());
+    }
+    
+    // 排序候选词库和可用词库
+    let mut final_word_list_sorted = final_word_list.clone();
+    final_word_list_sorted.sort();
+    let mut acceptable_word_list_sorted = acceptable_word_list.clone();
+    acceptable_word_list_sorted.sort();
+
     loop {
         let mut saved_guessed_strings: Vec<String> = Vec::new();
         let mut saved_alphabet_state: Vec<[Status; ALPHABET_SIZE]> = Vec::new();
@@ -204,7 +241,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut answer = String::new();
         if config.random {
             let mut rng = StdRng::seed_from_u64(config.seed);
-            let mut final_set_vec = FINAL.to_vec();
+            let mut final_set_vec = final_word_list_sorted.clone();
             final_set_vec.shuffle(&mut rng);
             // Get a random string as the final answer
             answer = final_set_vec[(config.day + bias - 1) as usize].to_ascii_uppercase();
@@ -235,7 +272,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let guess = guess.to_ascii_uppercase();
             let guess = guess.trim();
 
-            if is_valid(TOTAL_CHANCES - chances_left, guess, config.difficult, &saved_guessed_strings.last(), &saved_word_state.last()) {
+            if is_valid(TOTAL_CHANCES - chances_left, guess, config.difficult, &saved_guessed_strings.last(), &saved_word_state.last(), &acceptable_word_list_sorted) {
                 saved_guessed_strings.push(guess.to_string().clone());
                 all_guesses_strings.push(guess.to_string().clone());
                 let mut word_state = [Status::UNKNOWN; WORD_LENGTH];
