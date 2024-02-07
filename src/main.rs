@@ -12,7 +12,6 @@ mod cli;
 use cli::Cli;
 mod status;
 use status::Status;
-include!("builtin_words.rs");
 
 const TOTAL_CHANCES: i32 = 6;
 const WORD_LENGTH: usize = 5;
@@ -27,7 +26,7 @@ enum Outcome {
 /// Checks the validity of guessed word
 fn is_valid(round: i32, word: &str, difficult: bool, last_guessed_strings: &Option<&String>, last_word_state: &Option<&[Status; WORD_LENGTH]>, acceptable_set: &Vec<String>) -> bool {
     if !difficult || round == 1 {
-        ACCEPTABLE.contains(&(word.to_lowercase().as_str()))
+        acceptable_set.contains(&word.to_string())
     } else {
         let last_guessed_strings = last_guessed_strings.unwrap();
         let last_word_state = last_word_state.unwrap();
