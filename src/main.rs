@@ -13,7 +13,7 @@ use cli::Cli;
 mod status;
 use status::Status;
 
-const TOTAL_CHANCES: i32 = 6;
+const TOTAL_CHANCES: u32 = 6;
 const WORD_LENGTH: usize = 5;
 const ALPHABET_SIZE: usize = 26;
 const TOP_N: usize = 5;
@@ -24,7 +24,7 @@ enum Outcome {
 }
 
 /// Checks the validity of guessed word
-fn is_valid(round: i32, word: &str, difficult: bool, last_guessed_strings: &Option<&String>, last_word_state: &Option<&[Status; WORD_LENGTH]>, acceptable_set: &Vec<String>) -> bool {
+fn is_valid(round: u32, word: &str, difficult: bool, last_guessed_strings: &Option<&String>, last_word_state: &Option<&[Status; WORD_LENGTH]>, acceptable_set: &Vec<String>) -> bool {
     if !difficult || round == 1 {
         acceptable_set.contains(&word.to_string())
     } else {
@@ -66,7 +66,9 @@ fn is_valid(round: i32, word: &str, difficult: bool, last_guessed_strings: &Opti
 }
 
 /// Updates the state of the alphabet
-fn update_state(guess: &str, word_state: &mut[Status; WORD_LENGTH], alphabet_state: &mut[Status; ALPHABET_SIZE], answer: &str) {
+fn update_state(guess: &str, answer: &str,
+                word_state: &mut[Status; WORD_LENGTH],
+                alphabet_state: &mut[Status; ALPHABET_SIZE]) {
     assert_eq!(guess.len(), answer.len());
     let len = guess.len();
 
@@ -109,7 +111,8 @@ fn update_state(guess: &str, word_state: &mut[Status; WORD_LENGTH], alphabet_sta
 }
 
 /// Print the state of the word and the alphabet(not in tty)
-fn print_state_not_tty(word_state: &[Status; WORD_LENGTH], &alphabet_state: &[Status; ALPHABET_SIZE]) {
+fn print_state_not_tty(word_state: &[Status; WORD_LENGTH],
+                        alphabet_state: &[Status; ALPHABET_SIZE]) {
     for i in 0..word_state.len() {
         match word_state[i] {
             Status::RED => print!("R"),
@@ -133,7 +136,9 @@ fn print_state_not_tty(word_state: &[Status; WORD_LENGTH], &alphabet_state: &[St
 }
 
 /// Print the state of the word and the alphabet(in tty)
-fn print_state_tty(saved_guessed_strings: &Vec<String>, saved_word_state: &Vec<[Status; WORD_LENGTH]>, saved_alphabet_state: &Vec<[Status; ALPHABET_SIZE]>) {
+fn print_state_tty(saved_guessed_strings: &Vec<String>,
+                    saved_word_state: &Vec<[Status; WORD_LENGTH]>,
+                    saved_alphabet_state: &Vec<[Status; ALPHABET_SIZE]>) {
     assert_eq!(saved_word_state.len(), saved_alphabet_state.len());
     let len = saved_word_state.len();
     for i in 0..len {
@@ -160,8 +165,8 @@ fn print_state_tty(saved_guessed_strings: &Vec<String>, saved_word_state: &Vec<[
             }
         }
         println!("");
-        io::stdout().flush().unwrap();
     }
+    io::stdout().flush().unwrap();
 }
 
 /// Returns the top n frequent strings
@@ -221,17 +226,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut win_guesses = 0;
     let mut all_guesses_strings: Vec<String> = Vec::new();
 
-    let final_word_list = load_word_list(&config.final_set)?;
-    let acceptable_word_list = load_word_list(&config.acceptable_set)?;
+    let mut final_word_list = load_word_list(&config.final_set)?;
+    let mut acceptable_word_list = load_word_list(&config.acceptable_set)?;
     if !check_subset(&final_word_list, &acceptable_word_list) {
         return Err("The final word list is not a strict subset of the acceptable word list".into());
     }
     
     // 排序候选词库和可用词库
-    let mut final_word_list_sorted = final_word_list.clone();
-    final_word_list_sorted.sort();
-    let mut acceptable_word_list_sorted = acceptable_word_list.clone();
-    acceptable_word_list_sorted.sort();
+    final_word_list.sort();
+    acceptable_word_list.sort();
 
     loop {
         let mut saved_guessed_strings: Vec<String> = Vec::new();
@@ -240,7 +243,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut answer = String::new();
         if config.random {
             let mut rng = StdRng::seed_from_u64(config.seed);
-            let mut final_set_vec = final_word_list_sorted.clone();
+            let mut final_set_vec = final_word_list.clone();
             final_set_vec.shuffle(&mut rng);
             // Get a random string as the final answer
             answer = final_set_vec[(config.day + bias - 1) as usize].to_ascii_uppercase();
@@ -256,13 +259,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let answer = answer.to_ascii_uppercase();
         let answer = answer.trim();
         // let answer = answer.trim();
-        let mut chances_left = TOTAL_CHANCES;
+        let mut chances_used = 0u32;
         let mut alphabet_state = [Status::UNKNOWN; ALPHABET_SIZE];
 
         let status = loop {
-            chances_left -= 1;
+            chances_used += 1;
 
-            if chances_left < 0 {
+            if chances_used > TOTAL_CHANCES {
                 break Outcome::FAILED;
             }
 
@@ -271,11 +274,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let guess = guess.to_ascii_uppercase();
             let guess = guess.trim();
 
-            if is_valid(TOTAL_CHANCES - chances_left, guess, config.difficult, &saved_guessed_strings.last(), &saved_word_state.last(), &acceptable_word_list_sorted) {
+            if is_valid(chances_used, guess, config.difficult, &saved_guessed_strings.last(), &saved_word_state.last(), &acceptable_word_list) {
                 saved_guessed_strings.push(guess.to_string().clone());
                 all_guesses_strings.push(guess.to_string().clone());
                 let mut word_state = [Status::UNKNOWN; WORD_LENGTH];
-                update_state(guess, &mut word_state, &mut alphabet_state, answer);
+                update_state(guess, answer, &mut word_state, &mut alphabet_state);
                 saved_word_state.push(word_state);
                 saved_alphabet_state.push(alphabet_state);
                 match is_tty {
@@ -286,7 +289,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     break Outcome::SUCCESS;
                 }
             } else {
-                chances_left += 1;
+                chances_used -= 1;
                 println!("INVALID");
                 continue;
             }
@@ -294,9 +297,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         match status {
             Outcome::SUCCESS => {
-                println!("CORRECT {}", TOTAL_CHANCES - chances_left);
+                println!("CORRECT {}", chances_used);
                 win_rounds += 1;
-                win_guesses += TOTAL_CHANCES - chances_left;
+                win_guesses += chances_used;
             },
             Outcome::FAILED => {
                 println!("FAILED {}", answer);
