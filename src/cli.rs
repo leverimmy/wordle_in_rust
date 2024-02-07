@@ -1,6 +1,7 @@
 use clap::Parser;
+use serde::Deserialize;
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
     #[arg(short = 'w', long = "word", conflicts_with = "random", group = "word_mode")]
@@ -32,4 +33,39 @@ pub struct Cli {
 
     #[arg(short = 'c', long = "config")]
     pub config: Option<String>,
+}
+
+impl Cli {
+    pub fn merge(&mut self, from: Cli) {
+        if self.word == None {
+            self.word = from.word;
+        }
+        if self.random == false {
+            self.random = from.random;
+        }
+        if self.difficult == false {
+            self.difficult = from.difficult;
+        }
+        if self.stats == false {
+            self.stats = from.stats;
+        }
+        if self.day == None {
+            self.day = from.day;
+        }
+        if self.seed == None {
+            self.seed = from.seed;
+        }
+        if self.final_set == None {
+            self.final_set = from.final_set;
+        }
+        if self.acceptable_set == None {
+            self.acceptable_set = from.acceptable_set;
+        }
+        if self.state == None {
+            self.state = from.state;
+        }
+        if self.config == None {
+            self.config = from.config;
+        }
+    }
 }

@@ -224,11 +224,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 如果指定了 config.json
     if config.config != None {
-        if let Ok(file) = fs::read(config.config.unwrap()) {
+        if let Ok(file) = fs::read(config.config.clone().unwrap()) {
             // 如果当前文件存在，则取出来
-            // Todo
-            // let mut config_file: Cli = serde_json::from_slice(&file).expect("JSON 反序列化失败");
-            // config.merge(&mut config_file);
+            let config_file: Cli = serde_json::from_slice(&file).expect("JSON 反序列化失败");
+            config.merge(config_file);
         }
     }
 
