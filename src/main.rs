@@ -149,7 +149,7 @@ fn print_state_tty(saved_guessed_strings: &Vec<String>, saved_word_state: &Vec<[
         }
         print!(" ");
         let alphabet_state = saved_alphabet_state[i];
-        for letter in 'a'..='z' {
+        for letter in 'A'..='Z' {
             let index = (letter as u8 - b'A') as usize;
             match alphabet_state[index] {
                 Status::RED => print!("{}", letter.to_string().bold().red()),
@@ -286,7 +286,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        if config.word != "" || config.random {
+        if config.word != "" {
             break;
         }
         let mut option = String::new();
