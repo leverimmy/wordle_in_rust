@@ -6,14 +6,16 @@ use rand::seq::SliceRandom;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::collections::HashSet;
-use std::fs::read_to_string;
+use std::fs::{self, read_to_string};
 
 mod cli;
 use cli::Cli;
 mod status;
 use status::Status;
+mod state;
+use state::{State, Game};
 
-const TOTAL_CHANCES: u32 = 6;
+const TOTAL_CHANCES: usize = 6;
 const WORD_LENGTH: usize = 5;
 const ALPHABET_SIZE: usize = 26;
 const TOP_N: usize = 5;
@@ -24,7 +26,7 @@ enum Outcome {
 }
 
 /// Checks the validity of guessed word
-fn is_valid(round: u32, word: &str, difficult: bool, last_guessed_strings: &Option<&String>, last_word_state: &Option<&[Status; WORD_LENGTH]>, acceptable_set: &Vec<String>) -> bool {
+fn is_valid(round: usize, word: &str, difficult: bool, last_guessed_strings: &Option<&String>, last_word_state: &Option<&[Status; WORD_LENGTH]>, acceptable_set: &Vec<String>) -> bool {
     if !difficult || round == 1 {
         acceptable_set.contains(&word.to_string())
     } else {
@@ -40,7 +42,6 @@ fn is_valid(round: u32, word: &str, difficult: bool, last_guessed_strings: &Opti
         for i in 0..len {
             let letter = word.chars().nth(i).unwrap();
             let std_letter = last_guessed_strings.chars().nth(i).unwrap();
-            let index = (letter as u8 - b'A') as usize;
             if last_word_state[i] == Status::GREEN && letter != std_letter {
                 return false
             } else {
@@ -48,6 +49,7 @@ fn is_valid(round: u32, word: &str, difficult: bool, last_guessed_strings: &Opti
                     let std_index = (std_letter as u8 - b'A') as usize;
                     std_count[std_index] += 1;
                 }
+                let index = (letter as u8 - b'A') as usize;
                 counted[index] += 1;
             }
         }
@@ -170,8 +172,8 @@ fn print_state_tty(saved_guessed_strings: &Vec<String>,
 }
 
 /// Returns the top n frequent strings
-fn find_most_frequent_strings(strings: &Vec::<String>, n: usize) -> Vec<(String, u32)> {
-    let mut frequency_map: HashMap<String, u32> = HashMap::new();
+fn find_most_frequent_strings(strings: &Vec::<String>, n: usize) -> Vec<(String, usize)> {
+    let mut frequency_map: HashMap<String, usize> = HashMap::new();
 
     // 统计出现次数
     for s in strings {
@@ -179,7 +181,7 @@ fn find_most_frequent_strings(strings: &Vec::<String>, n: usize) -> Vec<(String,
     }
 
     // 排序并返回前 n 个出现次数最多的 String
-    let mut frequency_vec: Vec<(String, u32)> = frequency_map.into_iter().collect();
+    let mut frequency_vec: Vec<(String, usize)> = frequency_map.into_iter().collect();
     frequency_vec.sort_by(|(s1, c1), (s2, c2)| {
         c2.cmp(&c1).then_with(|| s1.cmp(&s2))
     });
@@ -214,6 +216,21 @@ fn check_subset(subset: &[String], superset: &[String]) -> bool {
     subset_set.is_subset(&superset_set)
 }
 
+// Read data from the datapack
+fn read_from_data(data: &State, win_rounds: &mut usize, total_rounds: &mut usize,
+                    win_guesses: &mut usize, all_guesses_strings: &mut Vec<String>) {
+    for game in data.games.iter() {
+        let answer = &game.answer;
+        let last_guess = game.guesses.last().unwrap();
+        if last_guess == answer {
+            *win_rounds += 1;
+            *win_guesses += game.guesses.len();
+        }
+        *total_rounds += 1;
+        game.guesses.iter().for_each(|g| all_guesses_strings.push(g.to_string()));
+    }
+}
+
 /// The main function for the Wordle game, implement your own logic here
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_tty = atty::is(atty::Stream::Stdout);
@@ -235,6 +252,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 排序候选词库和可用词库
     final_word_list.sort();
     acceptable_word_list.sort();
+
+    let mut data: State = State::default();
+
+    // 如果指定了 state.json
+    if config.state != "" {
+        if let Ok(file) = fs::read(&config.state) {
+            // 如果当前文件存在，则取出来
+            data = serde_json::from_slice(&file).expect("JSON 反序列化失败");
+            read_from_data(&data, &mut win_rounds, &mut total_rounds, &mut win_guesses, &mut all_guesses_strings);
+        }
+    }
 
     loop {
         let mut saved_guessed_strings: Vec<String> = Vec::new();
@@ -259,7 +287,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let answer = answer.to_ascii_uppercase();
         let answer = answer.trim();
         // let answer = answer.trim();
-        let mut chances_used = 0u32;
+        let mut chances_used = 0usize;
         let mut alphabet_state = [Status::UNKNOWN; ALPHABET_SIZE];
 
         let status = loop {
@@ -325,6 +353,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
+        data.total_rounds += 1;
+        data.games.push(Game {
+            answer: answer.to_string(),
+            guesses: saved_guessed_strings.clone(),
+        });
+
         if config.word != "" {
             break;
         }
@@ -337,6 +371,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "N" => break,
             _ => panic!("Invalid input!")
         }
+    }
+
+    if config.state != "" {
+        // 进行存档
+        fs::write(config.state, serde_json::to_string_pretty(&data).unwrap())?;
     }
 
     Ok(())

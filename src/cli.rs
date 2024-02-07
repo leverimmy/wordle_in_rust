@@ -27,9 +27,9 @@ pub struct Cli {
     #[arg(short = 'a', long = "acceptable-set", default_value_t = String::from("./acceptable_set.txt"))]
     pub acceptable_set: String,
 
-    #[arg(short = 'S', long = "state", default_value_t = String::from("./state.json"))]
+    #[arg(short = 'S', long = "state", default_value_t = String::from(""))]
     pub state: String,
 
-    #[arg(short = 'c', long = "config", default_value_t = String::from("./config.json"))]
+    #[arg(short = 'c', long = "config", default_value_t = String::from(""))]
     pub config: String,
 }

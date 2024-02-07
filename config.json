@@ -1,0 +1,11 @@
+{
+    "random": true,
+    "difficult": false,
+    "stats": true,
+    "day": 5,
+    "seed": 20220123,
+    "final_set": "./final_set.txt",
+    "acceptable_set": "./acceptable_set.txt",
+    "state": "./state.json",
+    "word": "cargo"
+  }
