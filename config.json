@@ -1,11 +1,9 @@
 {
-    "random": true,
-    "difficult": false,
-    "stats": true,
-    "day": 5,
-    "seed": 20220123,
-    "final_set": "./final_set.txt",
-    "acceptable_set": "./acceptable_set.txt",
-    "state": "./state.json",
-    "word": "cargo"
-  }
+  "stats": true,
+  "difficult": false,
+  "random": true,
+  "day": 5,
+  "seed": 20220123,
+  "final_set": "tests/data/06_01_specify_word_list_final.txt",
+  "acceptable_set": "tests/data/06_01_specify_word_list_acceptable.txt"
+}

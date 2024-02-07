@@ -216,26 +216,21 @@ fn check_subset(subset: &[String], superset: &[String]) -> bool {
     subset_set.is_subset(&superset_set)
 }
 
-// Read data from the datapack
-fn read_from_data(data: &State, win_rounds: &mut usize, total_rounds: &mut usize,
-                    win_guesses: &mut usize, all_guesses_strings: &mut Vec<String>) {
-    for game in data.games.iter() {
-        let answer = &game.answer;
-        let last_guess = game.guesses.last().unwrap();
-        if last_guess == answer {
-            *win_rounds += 1;
-            *win_guesses += game.guesses.len();
-        }
-        *total_rounds += 1;
-        game.guesses.iter().for_each(|g| all_guesses_strings.push(g.to_string()));
-    }
-}
-
 /// The main function for the Wordle game, implement your own logic here
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let is_tty = atty::is(atty::Stream::Stdout);
     // let is_tty = false;
-    let config = Cli::parse();
+    let mut config = Cli::parse();
+
+    // 如果指定了 config.json
+    if config.config != None {
+        if let Ok(file) = fs::read(config.config.unwrap()) {
+            // 如果当前文件存在，则取出来
+            // Todo
+            // let mut config_file: Cli = serde_json::from_slice(&file).expect("JSON 反序列化失败");
+            // config.merge(&mut config_file);
+        }
+    }
 
     let mut bias = 0;
     let mut win_rounds = 0;
@@ -243,8 +238,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut win_guesses = 0;
     let mut all_guesses_strings: Vec<String> = Vec::new();
 
-    let mut final_word_list = load_word_list(&config.final_set)?;
-    let mut acceptable_word_list = load_word_list(&config.acceptable_set)?;
+    let mut final_word_list = load_word_list(config.final_set.unwrap_or("./final_set.txt".to_string()).as_str())?;
+    let mut acceptable_word_list = load_word_list(config.acceptable_set.unwrap_or("./acceptable_set.txt".to_string()).as_str())?;
     if !check_subset(&final_word_list, &acceptable_word_list) {
         return Err("The final word list is not a strict subset of the acceptable word list".into());
     }
@@ -256,11 +251,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut data: State = State::default();
 
     // 如果指定了 state.json
-    if config.state != "" {
-        if let Ok(file) = fs::read(&config.state) {
+    if config.state != None {
+        if let Ok(file) = fs::read(config.state.clone().unwrap()) {
             // 如果当前文件存在，则取出来
             data = serde_json::from_slice(&file).expect("JSON 反序列化失败");
-            read_from_data(&data, &mut win_rounds, &mut total_rounds, &mut win_guesses, &mut all_guesses_strings);
+            for game in data.games.iter() {
+                let answer = &game.answer;
+                let last_guess = game.guesses.last().unwrap();
+                if last_guess == answer {
+                    win_rounds += 1;
+                    win_guesses += game.guesses.len();
+                }
+                total_rounds += 1;
+                game.guesses.iter().for_each(|g| all_guesses_strings.push(g.to_string()));
+            }
         }
     }
 
@@ -270,15 +274,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut saved_word_state: Vec<[Status; WORD_LENGTH]> = Vec::new();
         let mut answer = String::new();
         if config.random {
-            let mut rng = StdRng::seed_from_u64(config.seed);
+            let mut rng = StdRng::seed_from_u64(config.seed.unwrap_or(19260817));
             let mut final_set_vec = final_word_list.clone();
             final_set_vec.shuffle(&mut rng);
             // Get a random string as the final answer
-            answer = final_set_vec[(config.day + bias - 1) as usize].to_ascii_uppercase();
+            answer = final_set_vec[(config.day.unwrap_or(1) + bias - 1) as usize].to_ascii_uppercase();
         } else {
-            if config.word != "" {
+            if config.word != None {
                 // Get the string in config as the final answer
-                answer = config.word.to_ascii_uppercase();
+                answer = config.word.clone().unwrap().to_ascii_uppercase();
             } else {
                 // Get user's input string as the final answer
                 io::stdin().read_line(&mut answer)?;
@@ -286,7 +290,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         let answer = answer.to_ascii_uppercase();
         let answer = answer.trim();
-        // let answer = answer.trim();
+        
         let mut chances_used = 0usize;
         let mut alphabet_state = [Status::UNKNOWN; ALPHABET_SIZE];
 
@@ -359,7 +363,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             guesses: saved_guessed_strings.clone(),
         });
 
-        if config.word != "" {
+        if config.word != None {
             break;
         }
         let mut option = String::new();
@@ -373,9 +377,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    if config.state != "" {
+    if config.state != None {
         // 进行存档
-        fs::write(config.state, serde_json::to_string_pretty(&data).unwrap())?;
+        fs::write(config.state.clone().unwrap(), serde_json::to_string_pretty(&data).unwrap())?;
     }
 
     Ok(())
