@@ -25,7 +25,7 @@ enum Outcome {
 /// Checks the validity of guessed word
 fn is_valid(round: i32, word: &str, difficult: bool, last_guessed_strings: &Option<&String>, last_word_state: &Option<&[Status; WORD_LENGTH]>) -> bool {
     if !difficult || round == 1 {
-        ACCEPTABLE.contains(&word)
+        ACCEPTABLE.contains(&(word.to_lowercase().as_str()))
     } else {
         let last_guessed_strings = last_guessed_strings.unwrap();
         let last_word_state = last_word_state.unwrap();
@@ -39,12 +39,12 @@ fn is_valid(round: i32, word: &str, difficult: bool, last_guessed_strings: &Opti
         for i in 0..len {
             let letter = word.chars().nth(i).unwrap();
             let std_letter = last_guessed_strings.chars().nth(i).unwrap();
-            let index = (letter as u8 - b'a') as usize;
+            let index = (letter as u8 - b'A') as usize;
             if last_word_state[i] == Status::GREEN && letter != std_letter {
                 return false
             } else {
                 if last_word_state[i] == Status::YELLOW {
-                    let std_index = (std_letter as u8 - b'a') as usize;
+                    let std_index = (std_letter as u8 - b'A') as usize;
                     std_count[std_index] += 1;
                 }
                 counted[index] += 1;
@@ -53,7 +53,7 @@ fn is_valid(round: i32, word: &str, difficult: bool, last_guessed_strings: &Opti
         // 检查黄色字母
         for i in 0..len {
             let std_letter = last_guessed_strings.chars().nth(i).unwrap();
-            let std_index = (std_letter as u8 - b'a') as usize;
+            let std_index = (std_letter as u8 - b'A') as usize;
             if last_word_state[i] == Status::YELLOW {
                 if counted[std_index] < std_count[std_index] {
                     return false
@@ -72,7 +72,7 @@ fn update_state(guess: &str, word_state: &mut[Status; WORD_LENGTH], alphabet_sta
     let mut counted = [0; ALPHABET_SIZE];
     let std_count: [i32; 26] = answer.chars()
     .fold([0; 26], |mut acc, c| {
-        let index = (c as u8 - b'a') as usize;
+        let index = (c as u8 - b'A') as usize;
         acc[index] += 1;
         acc
     })
@@ -81,7 +81,7 @@ fn update_state(guess: &str, word_state: &mut[Status; WORD_LENGTH], alphabet_sta
     for i in 0usize..len {
         let guess_letter = guess.chars().nth(i).unwrap();
         let std_letter = answer.chars().nth(i).unwrap();
-        let index = (guess_letter as u8 - b'a') as usize;
+        let index = (guess_letter as u8 - b'A') as usize;
 
         if guess_letter == std_letter {
             counted[index] += 1;
@@ -92,7 +92,7 @@ fn update_state(guess: &str, word_state: &mut[Status; WORD_LENGTH], alphabet_sta
     for i in 0usize..len {
         let guess_letter = guess.chars().nth(i).unwrap();
         let std_letter = answer.chars().nth(i).unwrap();
-        let index = (guess_letter as u8 - b'a') as usize;
+        let index = (guess_letter as u8 - b'A') as usize;
 
         if guess_letter != std_letter {
             counted[index] += 1;
@@ -118,8 +118,8 @@ fn print_state_not_tty(word_state: &[Status; WORD_LENGTH], &alphabet_state: &[St
         }
     }
     print!(" ");
-    for letter in 'a'..='z' {
-        let index = (letter as u8 - b'a') as usize;
+    for letter in 'A'..='Z' {
+        let index = (letter as u8 - b'A') as usize;
         match alphabet_state[index] {
             Status::RED => print!("R"),
             Status::YELLOW => print!("Y"),
@@ -141,21 +141,21 @@ fn print_state_tty(saved_guessed_strings: &Vec<String>, saved_word_state: &Vec<[
         for j in 0..word_state.len() {
             let letter = guess.chars().nth(j).unwrap();
             match word_state[j] {
-                Status::RED => print!("{}", letter.to_ascii_uppercase().to_string().bold().red()),
-                Status::YELLOW => print!("{}", letter.to_ascii_uppercase().to_string().bold().yellow()),
-                Status::GREEN => print!("{}", letter.to_ascii_uppercase().to_string().bold().green()),
-                Status::UNKNOWN => print!("{}", letter.to_ascii_uppercase().to_string().bold()),
+                Status::RED => print!("{}", letter.to_string().bold().red()),
+                Status::YELLOW => print!("{}", letter.to_string().bold().yellow()),
+                Status::GREEN => print!("{}", letter.to_string().bold().green()),
+                Status::UNKNOWN => print!("{}", letter.to_string().bold()),
             }
         }
         print!(" ");
         let alphabet_state = saved_alphabet_state[i];
         for letter in 'a'..='z' {
-            let index = (letter as u8 - b'a') as usize;
+            let index = (letter as u8 - b'A') as usize;
             match alphabet_state[index] {
-                Status::RED => print!("{}", letter.to_ascii_uppercase().to_string().bold().red()),
-                Status::YELLOW => print!("{}", letter.to_ascii_uppercase().to_string().bold().yellow()),
-                Status::GREEN => print!("{}", letter.to_ascii_uppercase().to_string().bold().green()),
-                Status::UNKNOWN => print!("{}", letter.to_ascii_uppercase().to_string().bold()),
+                Status::RED => print!("{}", letter.to_string().bold().red()),
+                Status::YELLOW => print!("{}", letter.to_string().bold().yellow()),
+                Status::GREEN => print!("{}", letter.to_string().bold().green()),
+                Status::UNKNOWN => print!("{}", letter.to_string().bold()),
             }
         }
         println!("");
@@ -207,18 +207,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut final_set_vec = FINAL.to_vec();
             final_set_vec.shuffle(&mut rng);
             // Get a random string as the final answer
-            answer = final_set_vec[(config.day + bias - 1) as usize].to_string();
+            answer = final_set_vec[(config.day + bias - 1) as usize].to_ascii_uppercase();
         } else {
             if config.word != "" {
                 // Get the string in config as the final answer
-                answer = config.word.to_string();
+                answer = config.word.to_ascii_uppercase();
             } else {
                 // Get user's input string as the final answer
                 io::stdin().read_line(&mut answer)?;
             }
         }
-
+        let answer = answer.to_ascii_uppercase();
         let answer = answer.trim();
+        // let answer = answer.trim();
         let mut chances_left = TOTAL_CHANCES;
         let mut alphabet_state = [Status::UNKNOWN; ALPHABET_SIZE];
 
@@ -231,6 +232,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let mut guess = String::new();
             io::stdin().read_line(&mut guess)?;
+            let guess = guess.to_ascii_uppercase();
             let guess = guess.trim();
 
             if is_valid(TOTAL_CHANCES - chances_left, guess, config.difficult, &saved_guessed_strings.last(), &saved_word_state.last()) {
@@ -261,7 +263,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 win_guesses += TOTAL_CHANCES - chances_left;
             },
             Outcome::FAILED => {
-                println!("FAILED {}", answer.to_ascii_uppercase());
+                println!("FAILED {}", answer);
             },
         }
         total_rounds += 1;
@@ -275,7 +277,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let top5 = find_most_frequent_strings(&all_guesses_strings, TOP_N);
 
             for (i, (word, total)) in top5.iter().enumerate() {
-                print!("{} {}", word.to_ascii_uppercase(), total);
+                print!("{} {}", word, total);
                 if i < top5.len() - 1 {
                     print!(" ");
                 } else {
