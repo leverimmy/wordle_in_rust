@@ -26,7 +26,10 @@ enum Outcome {
 }
 
 /// Checks the validity of guessed word
-fn is_valid(word: &str, difficult: bool, last_guessed_string: &Option<&String>, last_word_state: &Option<&[Status; WORD_LENGTH]>, acceptable_set: &Vec<String>) -> bool {
+fn is_valid(word: &String, difficult: bool,
+            last_guessed_string: &Option<&String>,
+            last_word_state: &Option<&[Status; WORD_LENGTH]>,
+            acceptable_set: &Vec<String>) -> bool {
     if !difficult || *last_guessed_string == None {
         acceptable_set.contains(&word.to_string())
     } else {
@@ -68,7 +71,7 @@ fn is_valid(word: &str, difficult: bool, last_guessed_string: &Option<&String>, 
 }
 
 /// Updates the state of the alphabet
-fn update_state(guess: &str, answer: &str,
+fn update_state(guess: &String, answer: &String,
                 word_state: &mut[Status; WORD_LENGTH],
                 alphabet_state: &mut[Status; ALPHABET_SIZE]) {
     assert_eq!(guess.len(), answer.len());
@@ -194,7 +197,7 @@ fn find_most_frequent_strings(strings: &Vec::<String>, n: usize) -> Vec<(String,
 }
 
 /// Load word lists from files
-fn load_word_list(file_path: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+fn load_word_list(file_path: &String) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let content = read_to_string(file_path)?;
     let word_list: Vec<String> = content
         .lines()
@@ -237,8 +240,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut win_guesses = 0;
     let mut all_guesses_strings: Vec<String> = Vec::new();
 
-    let mut final_word_list = load_word_list(config.final_set.unwrap_or("./final_set.txt".to_string()).as_str())?;
-    let mut acceptable_word_list = load_word_list(config.acceptable_set.unwrap_or("./acceptable_set.txt".to_string()).as_str())?;
+    let mut final_word_list = load_word_list(&config.final_set.unwrap_or("./final_set.txt".to_string()))?;
+    let mut acceptable_word_list = load_word_list(&config.acceptable_set.unwrap_or("./acceptable_set.txt".to_string()))?;
     if !check_subset(&final_word_list, &acceptable_word_list) {
         return Err("The final word list is not a strict subset of the acceptable word list".into());
     }
@@ -290,8 +293,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 io::stdin().read_line(&mut answer)?;
             }
         }
-        let answer = answer.to_ascii_uppercase();
-        let answer = answer.trim();
+        let answer = answer.trim().to_uppercase();
         
         let mut chances_used = 0usize;
         let mut alphabet_state = [Status::UNKNOWN; ALPHABET_SIZE];
@@ -300,13 +302,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let status = loop {
             let mut guess = String::new();
             io::stdin().read_line(&mut guess)?;
-            let guess = guess.to_ascii_uppercase();
-            let guess = guess.trim();
+            let guess = guess.trim().to_uppercase();
 
             // 判断是否为合法输入
             // 1) 在单词库中
             // 2) 如果为 hard mode，则需要满足条件
-            if is_valid(guess, config.difficult, &saved_guessed_strings.last(), &saved_word_state.last(), &acceptable_word_list) {
+            if is_valid(&guess, config.difficult, &saved_guessed_strings.last(), &saved_word_state.last(), &acceptable_word_list) {
                 chances_used += 1;
                 
                 saved_guessed_strings.push(guess.to_string());
@@ -314,7 +315,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut word_state = [Status::UNKNOWN; WORD_LENGTH];
 
                 // 更新单词状态和字母表状态
-                update_state(guess, answer, &mut word_state, &mut alphabet_state);
+                update_state(&guess, &answer, &mut word_state, &mut alphabet_state);
                 saved_word_state.push(word_state);
                 saved_alphabet_state.push(alphabet_state);
 
@@ -382,9 +383,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         let mut option = String::new();
         io::stdin().read_line(&mut option)?;
-        let option = option.trim();
+        let option = option.trim().to_uppercase();
 
-        match option {
+        match option.as_str() {
             "Y" => bias += 1,
             "N" => break,
             _ => panic!("Invalid input!")
