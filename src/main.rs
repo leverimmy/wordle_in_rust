@@ -26,11 +26,11 @@ enum Outcome {
 }
 
 /// Checks the validity of guessed word
-fn is_valid(round: usize, word: &str, difficult: bool, last_guessed_strings: &Option<&String>, last_word_state: &Option<&[Status; WORD_LENGTH]>, acceptable_set: &Vec<String>) -> bool {
-    if !difficult || round == 1 {
+fn is_valid(word: &str, difficult: bool, last_guessed_string: &Option<&String>, last_word_state: &Option<&[Status; WORD_LENGTH]>, acceptable_set: &Vec<String>) -> bool {
+    if !difficult || *last_guessed_string == None {
         acceptable_set.contains(&word.to_string())
     } else {
-        let last_guessed_strings = last_guessed_strings.unwrap();
+        let last_guessed_string = last_guessed_string.unwrap();
         let last_word_state = last_word_state.unwrap();
         let len = word.len();
         // 标准黄色字母个数
@@ -41,7 +41,7 @@ fn is_valid(round: usize, word: &str, difficult: bool, last_guessed_strings: &Op
         // 检查绿色字母
         for i in 0..len {
             let letter = word.chars().nth(i).unwrap();
-            let std_letter = last_guessed_strings.chars().nth(i).unwrap();
+            let std_letter = last_guessed_string.chars().nth(i).unwrap();
             if last_word_state[i] == Status::GREEN && letter != std_letter {
                 return false
             } else {
@@ -55,7 +55,7 @@ fn is_valid(round: usize, word: &str, difficult: bool, last_guessed_strings: &Op
         }
         // 检查黄色字母
         for i in 0..len {
-            let std_letter = last_guessed_strings.chars().nth(i).unwrap();
+            let std_letter = last_guessed_string.chars().nth(i).unwrap();
             let std_index = (std_letter as u8 - b'A') as usize;
             if last_word_state[i] == Status::YELLOW {
                 if counted[std_index] < std_count[std_index] {
@@ -272,7 +272,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut saved_alphabet_state: Vec<[Status; ALPHABET_SIZE]> = Vec::new();
         let mut saved_word_state: Vec<[Status; WORD_LENGTH]> = Vec::new();
         let mut answer = String::new();
+
+        
         if config.random {
+            // 如果为随机模式
             let mut rng = StdRng::seed_from_u64(config.seed.unwrap_or(19260817));
             let mut final_set_vec = final_word_list.clone();
             final_set_vec.shuffle(&mut rng);
@@ -280,10 +283,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             answer = final_set_vec[(config.day.unwrap_or(1) + bias - 1) as usize].to_ascii_uppercase();
         } else {
             if config.word != None {
-                // Get the string in config as the final answer
+                // 如果指定单词
                 answer = config.word.clone().unwrap().to_ascii_uppercase();
             } else {
-                // Get user's input string as the final answer
+                // 从标准输入取出单词
                 io::stdin().read_line(&mut answer)?;
             }
         }
@@ -293,39 +296,47 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut chances_used = 0usize;
         let mut alphabet_state = [Status::UNKNOWN; ALPHABET_SIZE];
 
+        // 进行一轮猜测
         let status = loop {
-            chances_used += 1;
-
-            if chances_used > TOTAL_CHANCES {
-                break Outcome::FAILED;
-            }
-
             let mut guess = String::new();
             io::stdin().read_line(&mut guess)?;
             let guess = guess.to_ascii_uppercase();
             let guess = guess.trim();
 
-            if is_valid(chances_used, guess, config.difficult, &saved_guessed_strings.last(), &saved_word_state.last(), &acceptable_word_list) {
-                saved_guessed_strings.push(guess.to_string().clone());
-                all_guesses_strings.push(guess.to_string().clone());
+            // 判断是否为合法输入
+            // 1) 在单词库中
+            // 2) 如果为 hard mode，则需要满足条件
+            if is_valid(guess, config.difficult, &saved_guessed_strings.last(), &saved_word_state.last(), &acceptable_word_list) {
+                chances_used += 1;
+                
+                saved_guessed_strings.push(guess.to_string());
+                all_guesses_strings.push(guess.to_string());
                 let mut word_state = [Status::UNKNOWN; WORD_LENGTH];
+
+                // 更新单词状态和字母表状态
                 update_state(guess, answer, &mut word_state, &mut alphabet_state);
                 saved_word_state.push(word_state);
                 saved_alphabet_state.push(alphabet_state);
+
+                // 判断是否为交互模式
                 match is_tty {
                     true => print_state_tty(&saved_guessed_strings, &saved_word_state, &saved_alphabet_state),
                     false => print_state_not_tty(&word_state, &alphabet_state),
                 }
+                // 判断是否猜对
                 if guess == answer {
                     break Outcome::SUCCESS;
+                } else if chances_used == TOTAL_CHANCES {
+                    break Outcome::FAILED;
                 }
             } else {
-                chances_used -= 1;
                 println!("INVALID");
                 continue;
             }
         };
 
+        // 完成一轮游戏，输出结果
+        total_rounds += 1;
         match status {
             Outcome::SUCCESS => {
                 println!("CORRECT {}", chances_used);
@@ -336,8 +347,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("FAILED {}", answer);
             },
         }
-        total_rounds += 1;
 
+        // 输出统计数据
         if config.stats {
             println!("{} {} {:.2}", win_rounds, total_rounds - win_rounds,
                 match win_rounds {
@@ -356,12 +367,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        data.total_rounds += 1;
-        data.games.push(Game {
-            answer: answer.to_string(),
-            guesses: saved_guessed_strings.clone(),
-        });
+        // 更新存档
+        if config.state != None {
+            data.total_rounds = total_rounds;
+            data.games.push(Game {
+                answer: answer.to_string(),
+                guesses: saved_guessed_strings.clone(),
+            });
+        }
 
+        // 是否继续游戏
         if config.word != None {
             break;
         }
@@ -376,9 +391,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // 进行存档
     if config.state != None {
-        // 进行存档
-        fs::write(config.state.clone().unwrap(), serde_json::to_string_pretty(&data).unwrap())?;
+        fs::write(config.state.unwrap(), serde_json::to_string_pretty(&data).unwrap())?;
     }
 
     Ok(())
