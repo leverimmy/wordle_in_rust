@@ -71,7 +71,10 @@ impl<'de> Deserialize<'de> for State {
                 let total_rounds = total_rounds.unwrap_or_default();
                 let games = games.unwrap_or_default();
 
-                Ok(State { total_rounds, games })
+                Ok(State {
+                    total_rounds,
+                    games,
+                })
             }
         }
 

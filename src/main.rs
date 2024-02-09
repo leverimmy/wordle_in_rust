@@ -1,19 +1,18 @@
 use clap::Parser;
 use colored::Colorize;
-use std::collections::HashMap;
-use std::io::{self, Write};
-use rand::seq::SliceRandom;
 use rand::rngs::StdRng;
+use rand::seq::SliceRandom;
 use rand::SeedableRng;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::{self, read_to_string};
+use std::io::{self, Write};
 
 mod cli;
 use cli::Cli;
 mod status;
 use status::Status;
 mod state;
-use state::{State, Game};
+use state::{Game, State};
 
 const TOTAL_CHANCES: usize = 6;
 const WORD_LENGTH: usize = 5;
@@ -26,10 +25,13 @@ enum Outcome {
 }
 
 /// Checks the validity of guessed word
-fn is_valid(word: &String, difficult: bool,
-            last_guessed_string: &Option<&String>,
-            last_word_state: &Option<&[Status; WORD_LENGTH]>,
-            acceptable_set: &Vec<String>) -> bool {
+fn is_valid(
+    word: &String,
+    difficult: bool,
+    last_guessed_string: &Option<&String>,
+    last_word_state: &Option<&[Status; WORD_LENGTH]>,
+    acceptable_set: &Vec<String>,
+) -> bool {
     if !difficult || *last_guessed_string == None {
         acceptable_set.contains(&word.to_string())
     } else {
@@ -46,7 +48,7 @@ fn is_valid(word: &String, difficult: bool,
             let letter = word.chars().nth(i).unwrap();
             let std_letter = last_guessed_string.chars().nth(i).unwrap();
             if last_word_state[i] == Status::GREEN && letter != std_letter {
-                return false
+                return false;
             } else {
                 if last_word_state[i] == Status::YELLOW {
                     let std_index = (std_letter as u8 - b'A') as usize;
@@ -62,7 +64,7 @@ fn is_valid(word: &String, difficult: bool,
             let std_index = (std_letter as u8 - b'A') as usize;
             if last_word_state[i] == Status::YELLOW {
                 if counted[std_index] < std_count[std_index] {
-                    return false
+                    return false;
                 }
             }
         }
@@ -71,20 +73,24 @@ fn is_valid(word: &String, difficult: bool,
 }
 
 /// Updates the state of the alphabet
-fn update_state(guess: &String, answer: &String,
-                word_state: &mut[Status; WORD_LENGTH],
-                alphabet_state: &mut[Status; ALPHABET_SIZE]) {
+fn update_state(
+    guess: &String,
+    answer: &String,
+    word_state: &mut [Status; WORD_LENGTH],
+    alphabet_state: &mut [Status; ALPHABET_SIZE],
+) {
     assert_eq!(guess.len(), answer.len());
     let len = guess.len();
 
     let mut counted = [0; ALPHABET_SIZE];
-    let std_count: [i32; 26] = answer.chars()
-    .fold([0; 26], |mut acc, c| {
-        let index = (c as u8 - b'A') as usize;
-        acc[index] += 1;
-        acc
-    })
-    .into();
+    let std_count: [i32; 26] = answer
+        .chars()
+        .fold([0; 26], |mut acc, c| {
+            let index = (c as u8 - b'A') as usize;
+            acc[index] += 1;
+            acc
+        })
+        .into();
     // Match all the greens
     for i in 0usize..len {
         let guess_letter = guess.chars().nth(i).unwrap();
@@ -116,8 +122,10 @@ fn update_state(guess: &String, answer: &String,
 }
 
 /// Print the state of the word and the alphabet(not in tty)
-fn print_state_not_tty(word_state: &[Status; WORD_LENGTH],
-                        alphabet_state: &[Status; ALPHABET_SIZE]) {
+fn print_state_not_tty(
+    word_state: &[Status; WORD_LENGTH],
+    alphabet_state: &[Status; ALPHABET_SIZE],
+) {
     for i in 0..word_state.len() {
         match word_state[i] {
             Status::RED => print!("R"),
@@ -141,9 +149,11 @@ fn print_state_not_tty(word_state: &[Status; WORD_LENGTH],
 }
 
 /// Print the state of the word and the alphabet(in tty)
-fn print_state_tty(saved_guessed_strings: &Vec<String>,
-                    saved_word_state: &Vec<[Status; WORD_LENGTH]>,
-                    saved_alphabet_state: &Vec<[Status; ALPHABET_SIZE]>) {
+fn print_state_tty(
+    saved_guessed_strings: &Vec<String>,
+    saved_word_state: &Vec<[Status; WORD_LENGTH]>,
+    saved_alphabet_state: &Vec<[Status; ALPHABET_SIZE]>,
+) {
     assert_eq!(saved_word_state.len(), saved_alphabet_state.len());
     let len = saved_word_state.len();
     for i in 0..len {
@@ -175,7 +185,7 @@ fn print_state_tty(saved_guessed_strings: &Vec<String>,
 }
 
 /// Returns the top n frequent strings
-fn find_most_frequent_strings(strings: &Vec::<String>, n: usize) -> Vec<(String, usize)> {
+fn find_most_frequent_strings(strings: &Vec<String>, n: usize) -> Vec<(String, usize)> {
     let mut frequency_map: HashMap<String, usize> = HashMap::new();
 
     // 统计出现次数
@@ -185,9 +195,7 @@ fn find_most_frequent_strings(strings: &Vec::<String>, n: usize) -> Vec<(String,
 
     // 排序并返回前 n 个出现次数最多的 String
     let mut frequency_vec: Vec<(String, usize)> = frequency_map.into_iter().collect();
-    frequency_vec.sort_by(|(s1, c1), (s2, c2)| {
-        c2.cmp(&c1).then_with(|| s1.cmp(&s2))
-    });
+    frequency_vec.sort_by(|(s1, c1), (s2, c2)| c2.cmp(&c1).then_with(|| s1.cmp(&s2)));
 
     if frequency_vec.len() < n {
         frequency_vec
@@ -221,8 +229,8 @@ fn check_subset(subset: &[String], superset: &[String]) -> bool {
 
 /// The main function for the Wordle game, implement your own logic here
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let is_tty = atty::is(atty::Stream::Stdout);
-    // let is_tty = false;
+    // let is_tty = atty::is(atty::Stream::Stdout);
+    let is_tty = false;
     let mut config = Cli::parse();
 
     // 如果指定了 config.json
@@ -240,12 +248,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut win_guesses = 0;
     let mut all_guesses_strings: Vec<String> = Vec::new();
 
-    let mut final_word_list = load_word_list(&config.final_set.unwrap_or("./final_set.txt".to_string()))?;
-    let mut acceptable_word_list = load_word_list(&config.acceptable_set.unwrap_or("./acceptable_set.txt".to_string()))?;
+    let mut final_word_list =
+        load_word_list(&config.final_set.unwrap_or("./final_set.txt".to_string()))?;
+    let mut acceptable_word_list = load_word_list(
+        &config
+            .acceptable_set
+            .unwrap_or("./acceptable_set.txt".to_string()),
+    )?;
     if !check_subset(&final_word_list, &acceptable_word_list) {
-        return Err("The final word list is not a strict subset of the acceptable word list".into());
+        return Err(
+            "The final word list is not a strict subset of the acceptable word list".into(),
+        );
     }
-    
+
     // 排序候选词库和可用词库
     final_word_list.sort();
     acceptable_word_list.sort();
@@ -265,7 +280,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     win_guesses += game.guesses.len();
                 }
                 total_rounds += 1;
-                game.guesses.iter().for_each(|g| all_guesses_strings.push(g.to_string()));
+                game.guesses
+                    .iter()
+                    .for_each(|g| all_guesses_strings.push(g.to_string()));
             }
         }
     }
@@ -276,14 +293,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut saved_word_state: Vec<[Status; WORD_LENGTH]> = Vec::new();
         let mut answer = String::new();
 
-        
         if config.random {
             // 如果为随机模式
             let mut rng = StdRng::seed_from_u64(config.seed.unwrap_or(19260817));
             let mut final_set_vec = final_word_list.clone();
             final_set_vec.shuffle(&mut rng);
             // Get a random string as the final answer
-            answer = final_set_vec[(config.day.unwrap_or(1) + bias - 1) as usize].to_ascii_uppercase();
+            answer =
+                final_set_vec[(config.day.unwrap_or(1) + bias - 1) as usize].to_ascii_uppercase();
         } else {
             if config.word != None {
                 // 如果指定单词
@@ -294,7 +311,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         let answer = answer.trim().to_uppercase();
-        
+
         let mut chances_used = 0usize;
         let mut alphabet_state = [Status::UNKNOWN; ALPHABET_SIZE];
 
@@ -307,9 +324,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // 判断是否为合法输入
             // 1) 在单词库中
             // 2) 如果为 hard mode，则需要满足条件
-            if is_valid(&guess, config.difficult, &saved_guessed_strings.last(), &saved_word_state.last(), &acceptable_word_list) {
+            if is_valid(
+                &guess,
+                config.difficult,
+                &saved_guessed_strings.last(),
+                &saved_word_state.last(),
+                &acceptable_word_list,
+            ) {
                 chances_used += 1;
-                
+
                 saved_guessed_strings.push(guess.to_string());
                 all_guesses_strings.push(guess.to_string());
                 let mut word_state = [Status::UNKNOWN; WORD_LENGTH];
@@ -321,7 +344,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 // 判断是否为交互模式
                 match is_tty {
-                    true => print_state_tty(&saved_guessed_strings, &saved_word_state, &saved_alphabet_state),
+                    true => print_state_tty(
+                        &saved_guessed_strings,
+                        &saved_word_state,
+                        &saved_alphabet_state,
+                    ),
                     false => print_state_not_tty(&word_state, &alphabet_state),
                 }
                 // 判断是否猜对
@@ -343,19 +370,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("CORRECT {}", chances_used);
                 win_rounds += 1;
                 win_guesses += chances_used;
-            },
+            }
             Outcome::FAILED => {
                 println!("FAILED {}", answer);
-            },
+            }
         }
 
         // 输出统计数据
         if config.stats {
-            println!("{} {} {:.2}", win_rounds, total_rounds - win_rounds,
+            println!(
+                "{} {} {:.2}",
+                win_rounds,
+                total_rounds - win_rounds,
                 match win_rounds {
                     0 => 0f64,
                     _ => win_guesses as f64 / win_rounds as f64,
-                });
+                }
+            );
             let top5 = find_most_frequent_strings(&all_guesses_strings, TOP_N);
 
             for (i, (word, total)) in top5.iter().enumerate() {
@@ -388,13 +419,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         match option.as_str() {
             "Y" => bias += 1,
             "N" => break,
-            _ => panic!("Invalid input!")
+            _ => panic!("Invalid input!"),
         }
     }
 
     // 进行存档
     if config.state != None {
-        fs::write(config.state.unwrap(), serde_json::to_string_pretty(&data).unwrap())?;
+        fs::write(
+            config.state.unwrap(),
+            serde_json::to_string_pretty(&data).unwrap(),
+        )?;
     }
 
     Ok(())

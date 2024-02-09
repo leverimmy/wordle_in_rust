@@ -4,10 +4,20 @@ use serde::Deserialize;
 #[derive(Parser, Debug, Deserialize)]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
-    #[arg(short = 'w', long = "word", conflicts_with = "random", group = "word_mode")]
+    #[arg(
+        short = 'w',
+        long = "word",
+        conflicts_with = "random",
+        group = "word_mode"
+    )]
     pub word: Option<String>,
 
-    #[arg(short = 'r', long = "random", group = "random_mode", default_value_t = false)]
+    #[arg(
+        short = 'r',
+        long = "random",
+        group = "random_mode",
+        default_value_t = false
+    )]
     pub random: bool,
 
     #[arg(short = 'D', long = "difficult", default_value_t = false)]
